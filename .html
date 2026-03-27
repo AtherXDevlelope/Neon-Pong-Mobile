@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minecraft Cyberpunk - Mobile Edition</title>
+    <script src="https://www.gstatic.com"></script>
+    <script src="https://www.gstatic.com"></script>
+    <style>
+        :root { --blue: #00f2ff; --pink: #ff00ff; --yellow: #ffff00; --bg: #0a0a0a; --glow: 15px; }
+        body, html { margin: 0; padding: 0; overflow: hidden; background: var(--bg); color: white; font-family: 'Courier New', monospace; touch-action: none; }
+        
+        .low-gfx { --glow: 0px; }
+        .high-gfx { --glow: 20px; }
+
+        #ui-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; }
+        
+        .glitch { font-size: 2.5rem; color: var(--blue); text-shadow: 2px 2px var(--pink); animation: g 2s infinite; margin-bottom: 20px; text-transform: uppercase; text-align: center; }
+        @keyframes g { 0%, 100% { transform: skew(0); } 20% { transform: skew(-2deg); } 40% { transform: skew(2deg); } }
+
+        .btn {
+            background: rgba(0, 242, 255, 0.05); border: 2px solid var(--blue); color: var(--blue);
+            padding: 12px 20px; margin: 8px; cursor: pointer; font-size: 1rem; width: 85%; max-width: 320px;
+            text-align: center; transition: 0.2s; box-shadow: 0 0 var(--glow) rgba(0, 242, 255, 0.2);
+            text-transform: uppercase;
+        }
+
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #000; border: 3px solid var(--pink); padding: 20px; z-index: 1000; box-shadow: 0 0 50px var(--pink); text-align: center; width: 80%; max-width: 400px; }
+        
+        /* Reszponzív Canvas */
+        canvas { border: 3px solid var(--blue); background: #000; max-width: 95vw; max-height: 70vh; touch-action: none; }
+        
+        .auth-input { background: #000; border: 1px solid var(--pink); color: white; padding: 12px; margin: 10px; text-align: center; font-family: inherit; font-size: 1.2rem; width: 80%; outline: none; }
+        #alert-box { border-color: red; color: red; font-size: 5rem; box-shadow: 0 0 80px red; padding: 40px; }
+    </style>
+</head>
+<body id="core-body" class="high-gfx" onload="checkSession()">
+
+    <div id="fps-label" style="position:fixed; top:5px; left:5px; color:var(--yellow); display:none; z-index:2000; font-size: 0.7rem;">FPS: <span id="fps-val">0</span></div>
+
+    <!-- 1. LOGIN SCREEN -->
+    <div id="screen-auth" class="view">
+        <div id="ui-container">
+            <h1 class="glitch">SYSTEM_LOGIN</h1>
+            <input type="text" id="username-input" class="auth-input" placeholder="NÉV..." maxlength="12">
+            <div class="btn" onclick="startSystem()">KONNEKTÁLÁS</div>
+        </div>
+    </div>
+
+    <!-- 2. FŐMENÜ -->
+    <div id="screen-main" class="view" style="display:none;">
+        <div id="ui-container">
+            <p id="user-welcome" style="color:var(--pink); font-size: 0.8rem;"></p>
+            <h1 class="glitch">MINECRAFT_2077</h1>
+            <div class="btn" onclick="showTutorial()">[ START_SYSTEM ]</div>
+            <div class="btn" onclick="openLeaderboard()">[ RANGLISTA ]</div>
+            <div class="btn" onclick="document.getElementById('custom-modal').style.display='block'">[ CUSTOMIZE ]</div>
+            <div class="btn" onclick="showView('screen-settings')">[ SETTINGS_CORE ]</div>
+        </div>
+    </div>
+
+    <!-- TUTORIAL MODAL -->
+    <div id="tutorial-modal" class="modal">
+        <h2 style="color:var(--yellow)">>> MOBIL_OKTATÁS <<</h2>
+        <p>Húzd az ujjad a képernyőn az ütő irányításához.</p>
+        <p>A meccs 5 pontig tart OkosBot ellen.</p>
+        <div class="btn" onclick="initPong()">MEHET!</div>
+    </div>
+
+    <!-- PONG JÁTÉK -->
+    <div id="screen-pong" class="view" style="display:none;">
+        <div id="ui-container">
+            <div style="font-size:1.2rem; color:var(--yellow); margin-bottom:5px;">
+                USER: <span id="ps">0</span> | <span style="color:var(--pink)">OkosBot</span>: <span id="bs">0</span>
+            </div>
+            <canvas id="pongCanvas" width="800" height="400"></canvas>
+            <div class="btn" style="margin-top:10px; width:100px; font-size:0.7rem;" onclick="openPause()">SZÜNET</div>
+        </div>
+    </div>
+
+    <!-- SZÜNET MENÜ -->
+    <div id="screen-pause" class="view" style="display:none; position:fixed; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:5000;">
+        <div id="ui-container">
+            <h1 style="color:var(--pink)">PAUSE</h1>
+            <div class="btn" onclick="resumeGame()">FOLYTATÁS</div>
+            <div class="btn" onclick="location.reload()">FŐMENÜ</div>
+        </div>
+    </div>
+
+    <div id="custom-modal" class="modal">
+        <h3 style="color:var(--blue)">ÜTŐ SZÍNE</h3>
+        <button style="background:#00f2ff; width:40px; height:40px;" onclick="setPaddleColor('#00f2ff')"></button>
+        <button style="background:#ffff00; width:40px; height:40px;" onclick="setPaddleColor('#ffff00')"></button>
+        <button style="background:#39ff14; width:40px; height:40px;" onclick="setPaddleColor('#39ff14')"></button>
+        <br><br><div class="btn" onclick="document.getElementById('custom-modal').style.display='none'">X</div>
+    </div>
+
+    <div id="leaderboard-modal" class="modal">
+        <h3 style="color:var(--yellow)">RANGLISTA</h3>
+        <div id="leaderboard-content" style="text-align:left; font-size: 0.9rem;"></div>
+        <div class="btn" onclick="document.getElementById('leaderboard-modal').style.display='none'">OK</div>
+    </div>
+
+    <div id="screen-settings" class="view" style="display:none;">
+        <div id="ui-container">
+            <div class="btn" onclick="applyGfx('low')">LOW GRAFIKA</div>
+            <div class="btn" onclick="applyGfx('high')">HIGH GRAFIKA</div>
+            <div class="btn" onclick="toggleFPS()">FPS MONITOR: BE/KI</div>
+            <div class="btn" onclick="showView('screen-main')">VISSZA</div>
+        </div>
+    </div>
+
+    <div id="alert-box" class="modal" onclick="this.style.display='none'">X</div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCGTXsK82_1M7PafKc5dxTRaM4KiRf0D5I",
+            authDomain: "pong-f15a0.firebaseapp.com",
+            projectId: "pong-f15a0",
+            databaseURL: "https://pong-f15a0-default-rtdb.europe-west1.firebasedatabase.app",
+            appId: "1:990834323720:web:277b7abf7c1d92fa99fcbd"
+        };
+        try { firebase.initializeApp(firebaseConfig); var db = firebase.database(); } catch(e) {}
+
+        let currentUser = "", gameActive = false, pScore = 0, bScore = 0, paddleColor = '#00f2ff', gfxMode = 'high', fpsShow = false;
+        const cvs = document.getElementById("pongCanvas");
+        const ctx = cvs.getContext("2d");
+        let ball = { x: 400, y: 200, vx: 5, vy: 5, r: 10 }; // Kicsit nagyobb labda mobilra
+        let py = 150, by = 150, ph = 90, pw = 15; // Nagyobb ütő mobilra
+
+        function showView(id) {
+            document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+            document.getElementById(id).style.display = 'block';
+        }
+
+        function checkSession() {
+            let sessionUser = sessionStorage.getItem('activeUser');
+            if (sessionUser) { currentUser = sessionUser; showView('screen-main'); document.getElementById('user-welcome').innerText = "LINKED: " + currentUser; }
+        }
+
+        function startSystem() {
+            let name = document.getElementById('username-input').value.trim();
+            if(name.length < 3) return alert("Minimum 3 betű!");
+            currentUser = name.toUpperCase();
+            sessionStorage.setItem('activeUser', currentUser);
+            showView('screen-main');
+        }
+
+        function showTutorial() { document.getElementById('tutorial-modal').style.display = 'block'; }
+        function initPong() { document.getElementById('tutorial-modal').style.display = 'none'; showView('screen-pong'); pScore = 0; bScore = 0; gameActive = true; loop(); }
+        function openPause() { gameActive = false; showView('screen-pause'); }
+        function resumeGame() { showView('screen-pong'); gameActive = true; loop(); }
+        function applyGfx(lv) { gfxMode = lv; document.getElementById('core-body').className = lv + '-gfx'; }
+        function toggleFPS() { fpsShow = !fpsShow; document.getElementById('fps-label').style.display = fpsShow ? 'block' : 'none'; }
+        function setPaddleColor(c) { paddleColor = c; document.getElementById('custom-modal').style.display = 'none'; }
+
+        function openLeaderboard() {
+            document.getElementById('leaderboard-modal').style.display = 'block';
+            if(!db) return;
+            db.ref('global_leaderboard').orderByChild('score').limitToLast(5).once('value', (snapshot) => {
+                let html = ""; snapshot.forEach(child => { let p = child.val(); html = `<div>${p.name}: ${p.score}</div>` + html; });
+                document.getElementById('leaderboard-content').innerHTML = html || "Üres.";
+            });
+        }
+
+        // --- MOBIL IRÁNYÍTÁS (Touch) ---
+        function handleTouch(e) {
+            if(!gameActive) return;
+            let r = cvs.getBoundingClientRect();
+            let touchY = e.touches[0].clientY - r.top;
+            let scaleY = cvs.height / r.height; // Skálázás a canvas méretéhez
+            py = touchY * scaleY - ph/2;
+            if(py < 0) py = 0; if(py > cvs.height - ph) py = cvs.height - ph;
+            e.preventDefault();
+        }
+        cvs.addEventListener('touchstart', handleTouch);
+        cvs.addEventListener('touchmove', handleTouch);
+        
+        // Egér irányítás megtartása PC-re
+        cvs.addEventListener('mousemove', e => {
+            let r = cvs.getBoundingClientRect();
+            let scaleY = cvs.height / r.height;
+            py = (e.clientY - r.top) * scaleY - ph/2;
+        });
+
+        function loop() {
+            if(!gameActive) return;
+            ctx.fillStyle = "black"; ctx.fillRect(0, 0, cvs.width, cvs.height);
+            
+            by += (ball.y - (by + ph/2)) * 0.18;
+            ball.x += ball.vx; ball.y += ball.vy;
+
+            if(ball.y <= 0 || ball.y >= cvs.height) ball.vy *= -1;
+            if(ball.x < 25 && ball.y > py && ball.y < py+ph) ball.vx = Math.abs(ball.vx) * 1.02;
+            if(ball.x > cvs.width-25 && ball.y > by && ball.y < by+ph) ball.vx = -Math.abs(ball.vx) * 1.02;
+
+            if(ball.x < 0) { bScore++; reset(); if(bScore>=5) finish(false); }
+            if(ball.x > cvs.width) { pScore++; reset(); if(pScore>=5) finish(true); }
+
+            ctx.shadowBlur = (gfxMode === 'high') ? 20 : 0;
+            ctx.fillStyle = paddleColor; ctx.shadowColor = paddleColor; ctx.fillRect(10, py, pw, ph);
+            ctx.fillStyle = "#ff00ff"; ctx.shadowColor = "#ff00ff"; ctx.fillRect(cvs.width-25, by, pw, ph);
+            ctx.fillStyle = "#ffff00"; ctx.shadowColor = "#ffff00"; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+            
+            document.getElementById('ps').innerText = pScore;
+            document.getElementById('bs').innerText = bScore;
+            requestAnimationFrame(loop);
+        }
+
+        function reset() { ball.x = 400; ball.y = 200; ball.vx = (ball.vx > 0 ? -5 : 5); }
+        function finish(win) {
+            gameActive = false; alert(win ? "GYŐZELEM!" : "VESZTETTÉL!");
+            if(win && db) db.ref('global_leaderboard/' + currentUser).transaction(c => ({name: currentUser, score: (c?c.score:0)+1}));
+            location.reload();
+        }
+    </script>
+</body>
+</html>
